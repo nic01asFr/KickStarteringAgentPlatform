@@ -6,7 +6,7 @@ build/
 *.js.map
 *.d.ts.map
 
-# Environment — jamais committer
+# Environment — never commit
 .env
 .env.local
 .env.*.local
@@ -25,15 +25,21 @@ Thumbs.db
 coverage/
 .tsx/
 
-# KAP data — bases Kuzu locales et sessions (données de dev, pas du code)
+# Local data dirs (not project knowledge)
 /data/
-.kap/
 
-# Claude Code local settings — contient des tokens, jamais committer
+# .kap/ is tracked: kap.json, decisions/, updates/ are the public PKG
+# Ignore only local binary / cache artifacts if present under .kap
+.kap/**/*.db
+.kap/**/*.db-wal
+.kap/**/*.db-shm
+.kap/.cache/
+
+# Claude Code local settings — may contain tokens
 .claude/settings.json
 .claude/settings.local.json
 
-# MCP config locale — peut contenir des tokens
+# Local MCP config — may contain tokens
 .mcp.json
 
 # Test files
