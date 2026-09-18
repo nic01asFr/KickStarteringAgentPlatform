@@ -6,6 +6,8 @@ on:
     paths:
       - 'apps/platform/**'
       - '.kap/**'
+      - 'package-lock.json'
+      - 'package.json'
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
@@ -30,7 +32,15 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - run: npm ci
+      # Prefer ci when lock is in sync; fall back so a rename does not block Pages
+      - name: Install dependencies
+        run: |
+          if npm ci; then
+            echo "npm ci ok"
+          else
+            echo "npm ci failed — regenerating lock via npm install"
+            npm install
+          fi
 
       - run: npm run build --workspace=apps/platform
         env:
