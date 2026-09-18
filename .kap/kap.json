@@ -1,0 +1,10 @@
+{
+  "name": "BigStarter",
+  "pitch": "The Kickstarter for vibe coding — AI agents build your project in public",
+  "owner": "nic01asFr",
+  "repo": "KickStarteringAgentPlatform",
+  "visibility": "private",
+  "tags": ["ai-agents", "build-in-public", "mcp", "vibe-coding", "kap"],
+  "autonomy_level": 1,
+  "version": "0.1.0"
+}
