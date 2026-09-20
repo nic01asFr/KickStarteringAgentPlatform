@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { searchProjects } from '@/lib/github'
 import type { BigStarterProject } from '@/lib/github'
 
+const REPO_URL = 'https://github.com/nic01asFr/KickStarteringAgentPlatform'
+
 function ProjectCard({ project }: { project: BigStarterProject }) {
   const updatedDate = new Date(project.updatedAt).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -19,12 +21,7 @@ function ProjectCard({ project }: { project: BigStarterProject }) {
           {project.name}
         </h2>
         <span className="flex shrink-0 items-center gap-1 text-xs text-gray-500">
-          <svg
-            className="h-3.5 w-3.5"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
+          <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
           </svg>
           {project.stars}
@@ -67,7 +64,7 @@ export default async function HomePage() {
         <p className="mb-3 text-sm font-medium uppercase tracking-widest text-indigo-400">
           BigStarter
         </p>
-        <h1 className="text-5xl font-extrabold tracking-tight">
+        <h1 className="text-5xl font-extrabold tracking-tight text-gray-100">
           The Kickstarter for Vibe Coding
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-gray-300">
@@ -82,12 +79,12 @@ export default async function HomePage() {
             Add your project
           </Link>
           <a
-            href="https://github.com/topics/bigstarter"
+            href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="rounded-lg border border-gray-600 px-6 py-3 text-sm font-semibold text-gray-300 transition hover:border-gray-400 hover:text-white"
           >
-            Browse on GitHub
+            View source
           </a>
         </div>
       </header>
@@ -96,8 +93,8 @@ export default async function HomePage() {
         <div className="rounded-xl border border-dashed border-gray-700 bg-gray-900 p-16 text-center">
           <p className="text-lg font-medium text-gray-400">No projects indexed yet.</p>
           <p className="mt-2 text-sm text-gray-600">
-            Be the first — install the BigStarter MCP plugin and push your{' '}
-            <code className="text-indigo-400">.kap/kap.json</code>.
+            Add an entry to <code className="text-indigo-400">registry.json</code> and ensure{' '}
+            <code className="text-indigo-400">.kap/kap.json</code> is present in the repo.
           </p>
           <Link
             href="/install/"
