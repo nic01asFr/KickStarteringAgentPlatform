@@ -2,89 +2,65 @@
 /**
  * KAP MCP Server — entrypoint.
  *
- * Deux modes :
- *   LOCAL  (KAP_API_URL=local ou absent) — Kuzu direct, sampling pour LLM, zéro backend
- *   REMOTE (KAP_API_URL=https://...) — HTTP backend, Anthropic API directe
- *
- * Primitives MCP exposées :
- *   Tools     — actions actives (kap_report_event, kap_pkg_write, etc.)
- *   Resources — données lisibles via @mention (kap://decisions, kap://vision, etc.)
- *   Prompts   — slash commands versionnés (/mcp__kap__agent_setup, etc.)
- *   Sampling  — délégation d'appels LLM au client (local mode uniquement)
+ * LOCAL (default): .kap/ markdown files + optional GitHub push + sampling
+ * REMOTE (KAP_API_URL=https://...): HTTP backend
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
-import { initConfig } from "./config.js"
-import { registerAllTools } from "./tools/index.js"
-import { registerResources } from "./resources.js"
-import { registerPrompts } from "./prompts.js"
-
-const LOCAL_MODE = !process.env["KAP_API_URL"] || process.env["KAP_API_URL"] === "local"
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { initConfig } from './config.js'
+import { registerAllTools, isLocalMode } from './tools/index.js'
+import { registerResources } from './resources.js'
+import { registerPrompts } from './prompts.js'
 
 async function main(): Promise<void> {
-  if (!LOCAL_MODE) {
+  if (!isLocalMode()) {
     initConfig()
   }
 
   const server = new McpServer(
     {
-      name: "kap-server",
-      version: "0.2.0",
-      // description est le champ standard dans cette version du SDK (instructions = spec future)
-      description: `KAP (KickStartering Agent Platform) — project memory and community feedback server.
+      name: 'kap-server',
+      version: '0.3.0',
+      description: `KAP — project memory and build-in-public updates.
+
+LOCAL MODE stores decisions and updates as markdown under .kap/ (git is the database).
 
 USE THESE TOOLS WHEN:
-- Starting a session on a KAP-connected project (kap_pkg_build_context)
-- Making an architectural or technical decision worth remembering (kap_pkg_write)
-- Completing a commit, test run, deploy, or milestone (kap_report_event)
-- Planning the next sprint or feature priority (kap_fetch_feedback)
-- Searching for past decisions before implementing a pattern (kap_pkg_query)
-- A decision exceeds your autonomy level (kap_escalate_to_admin)
+- Starting a session (kap_pkg_build_context)
+- Recording a significant decision (kap_pkg_write)
+- Completing a milestone (kap_report_event)
+- Checking community signals (kap_fetch_feedback)
+- Searching past decisions (kap_pkg_query)
+- Escalating beyond autonomy (kap_escalate_to_admin)
 
-DO NOT use these tools for:
-- Trivial code changes (variable renames, style fixes)
-- Decisions already recorded in the current session context
-- Reporting every single commit — only significant milestones
-
-RESOURCES (use via @mention, not tool calls):
-- @kap://decisions: recent architectural decisions
-- @kap://vision: foundational project vision
-- @kap://signals: pending community feature requests
-- @kap://artifacts: recent events and deployments
-
-Autonomy level 1: execute freely, escalate architectural/financial/auth decisions.`,
+RESOURCES:
+- @kap://decisions, @kap://vision, @kap://signals, @kap://artifacts`,
     },
     {
       capabilities: {
-        tools:     { listChanged: true },
+        tools: { listChanged: true },
         resources: { subscribe: false, listChanged: true },
-        prompts:   { listChanged: false },
-        logging:   {},
-        // sampling est déclaré via experimental pour compatibilité SDK
+        prompts: { listChanged: false },
+        logging: {},
         experimental: { sampling: {} },
       },
     },
   )
 
-  // ---- Tools ----
   registerAllTools(server)
 
-  // ---- Resources (PKG comme données lisibles via @mention) ----
-  if (LOCAL_MODE) {
+  if (isLocalMode()) {
     registerResources(server)
-  }
-
-  // ---- Prompts (slash commands versionnés) ----
-  if (LOCAL_MODE) {
     registerPrompts(server)
   }
 
-  // ---- Transport stdio ----
   const transport = new StdioServerTransport()
   await server.connect(transport)
 
-  const mode = LOCAL_MODE ? "local (Kuzu + sampling)" : "remote (HTTP backend)"
+  const mode = isLocalMode()
+    ? 'local (.kap markdown files)'
+    : 'remote (HTTP backend)'
   process.stderr.write(`[kap-mcp-server] started — mode: ${mode}\n`)
 }
 
