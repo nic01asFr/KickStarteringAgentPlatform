@@ -13,19 +13,15 @@ interface PageProps {
 }
 
 export async function generateStaticParams(): Promise<Array<{ owner: string; repo: string }>> {
-  // Fallback: always pre-render the BigStarter project itself
-  const seed = [{ owner: 'nic01asFr', repo: 'KickStarteringAgentPlatform' }]
   try {
     const projects = await searchProjects()
-    const discovered = projects.map((p) => ({ owner: p.owner, repo: p.repo }))
-    // Merge seed + discovered, deduplicated
-    const seen = new Set(seed.map(p => `${p.owner}/${p.repo}`))
-    for (const p of discovered) {
-      const key = `${p.owner}/${p.repo}`
-      if (!seen.has(key)) { seen.add(key); seed.push(p) }
+    if (projects.length > 0) {
+      return projects.map((p) => ({ owner: p.owner, repo: p.repo }))
     }
-  } catch { /* network unavailable at build time — use seed only */ }
-  return seed
+  } catch {
+    /* fall through */
+  }
+  return [{ owner: 'nic01asFr', repo: 'KickStarteringAgentPlatform' }]
 }
 
 function StatCard({ label, value }: { label: string; value: number }) {
@@ -59,9 +55,9 @@ export default async function ProjectPage({ params }: PageProps) {
     <main className="mx-auto max-w-3xl px-4 py-12">
       <header className="mb-10">
         <p className="mb-2 text-sm font-medium uppercase tracking-widest text-indigo-400">
-          BigStarter Project
+          Project
         </p>
-        <h1 className="text-4xl font-extrabold tracking-tight">{project.name}</h1>
+        <h1 className="text-4xl font-extrabold tracking-tight text-gray-100">{project.name}</h1>
         <p className="mt-4 text-lg leading-relaxed text-gray-300">{project.pitch}</p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {project.tags.map((tag) => (
@@ -132,9 +128,6 @@ export default async function ProjectPage({ params }: PageProps) {
         >
           Follow on GitHub
         </a>
-        <p className="mt-2 text-center text-xs text-gray-500">
-          Star the repo to follow this project's progress
-        </p>
       </section>
 
       <UpdateFeed owner={owner} repo={repo} initialUpdates={updates} />

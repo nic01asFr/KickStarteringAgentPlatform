@@ -1,6 +1,10 @@
 const GITHUB_API = 'https://api.github.com'
 const TOKEN = process.env['NEXT_PUBLIC_GITHUB_TOKEN']
 
+/** Repo that hosts registry.json (this platform monorepo by default). */
+const REGISTRY_OWNER = process.env['REGISTRY_OWNER'] ?? 'nic01asFr'
+const REGISTRY_REPO = process.env['REGISTRY_REPO'] ?? 'KickStarteringAgentPlatform'
+
 function githubHeaders(): HeadersInit {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github.v3+json',
@@ -14,7 +18,7 @@ function githubHeaders(): HeadersInit {
 async function githubFetch(url: string): Promise<Response> {
   const res = await fetch(url, {
     headers: githubHeaders(),
-    next: { revalidate: 1800 }, // 30 min cache — aligns with rebuild schedule
+    next: { revalidate: 1800 },
   })
   const remaining = res.headers.get('X-RateLimit-Remaining')
   if (remaining !== null && Number(remaining) < 5) {
@@ -72,16 +76,6 @@ export interface ProjectSignal {
   url: string
 }
 
-interface GitHubCodeSearchItem {
-  repository: {
-    full_name: string
-    stargazers_count: number
-    updated_at: string
-    owner: { login: string }
-    name: string
-  }
-}
-
 interface GitHubContentFile {
   content: string
   encoding: string
@@ -99,50 +93,51 @@ interface KapJson {
   tags?: string[]
 }
 
-// Cherche tous les repos avec .kap/kap.json via GitHub Search API
-export async function searchProjects(): Promise<BigStarterProject[]> {
-  try {
-    const res = await githubFetch(
-      `${GITHUB_API}/search/code?q=filename:kap.json+path:.kap&per_page=50`
-    )
-    if (!res.ok) return []
-
-    const data = await res.json() as { items?: GitHubCodeSearchItem[] }
-    const items = data.items ?? []
-
-    const projects = await Promise.allSettled(
-      items.map(async (item) => {
-        const { owner, name: repoName, full_name, stargazers_count, updated_at } = item.repository
-        const project = await getProject(owner.login, repoName)
-        if (!project) return null
-        return {
-          ...project,
-          stars: stargazers_count,
-          updatedAt: updated_at,
-          owner: owner.login,
-          repo: repoName,
-          // full_name used only for deduplication
-          _full_name: full_name,
-        }
-      })
-    )
-
-    const seen = new Set<string>()
-    const result: BigStarterProject[] = []
-    for (const settled of projects) {
-      if (settled.status !== 'fulfilled' || !settled.value) continue
-      const { _full_name, ...p } = settled.value
-      if (seen.has(_full_name)) continue
-      seen.add(_full_name)
-      result.push(p)
-    }
-    return result
-  } catch {
-    return []
-  }
+interface RegistryFile {
+  projects?: Array<{ owner: string; repo: string }>
 }
 
-// Lit les metadonnees d'un projet depuis son kap.json
+/**
+ * Index projects from registry.json (authoritative for MVP).
+ * Code search is not used — private repos and rate limits break it.
+ */
+export async function searchProjects(): Promise<BigStarterProject[]> {
+  const seed = [{ owner: REGISTRY_OWNER, repo: REGISTRY_REPO }]
+  let entries = seed
+
+  try {
+    const res = await githubFetch(
+      `${GITHUB_API}/repos/${REGISTRY_OWNER}/${REGISTRY_REPO}/contents/registry.json`
+    )
+    if (res.ok) {
+      const file = (await res.json()) as GitHubContentFile
+      if (file.encoding === 'base64') {
+        const registry = JSON.parse(decodeBase64(file.content)) as RegistryFile
+        if (registry.projects && registry.projects.length > 0) {
+          entries = registry.projects
+        }
+      }
+    }
+  } catch {
+    /* use seed */
+  }
+
+  const settled = await Promise.allSettled(
+    entries.map((e) => getProject(e.owner, e.repo))
+  )
+
+  const result: BigStarterProject[] = []
+  const seen = new Set<string>()
+  for (const s of settled) {
+    if (s.status !== 'fulfilled' || !s.value) continue
+    const key = `${s.value.owner}/${s.value.repo}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(s.value)
+  }
+  return result
+}
+
 export async function getProject(owner: string, repo: string): Promise<BigStarterProject | null> {
   try {
     const res = await githubFetch(
@@ -150,16 +145,15 @@ export async function getProject(owner: string, repo: string): Promise<BigStarte
     )
     if (!res.ok) return null
 
-    const file = await res.json() as GitHubContentFile
+    const file = (await res.json()) as GitHubContentFile
     if (file.encoding !== 'base64') return null
 
     const raw = decodeBase64(file.content)
     const kap = JSON.parse(raw) as KapJson
 
-    // Fetch repo metadata for stars/updatedAt
     const repoRes = await githubFetch(`${GITHUB_API}/repos/${owner}/${repo}`)
     const repoData = repoRes.ok
-      ? await repoRes.json() as { stargazers_count: number; updated_at: string }
+      ? ((await repoRes.json()) as { stargazers_count: number; updated_at: string })
       : { stargazers_count: 0, updated_at: new Date().toISOString() }
 
     return {
@@ -176,7 +170,6 @@ export async function getProject(owner: string, repo: string): Promise<BigStarte
   }
 }
 
-// Lit les updates depuis .kap/updates/ du repo
 export async function getProjectUpdates(owner: string, repo: string): Promise<ProjectUpdate[]> {
   try {
     const res = await githubFetch(
@@ -184,7 +177,7 @@ export async function getProjectUpdates(owner: string, repo: string): Promise<Pr
     )
     if (!res.ok) return []
 
-    const files = await res.json() as Array<{ name: string; download_url: string | null; type: string }>
+    const files = (await res.json()) as Array<{ name: string; type: string }>
     const mdFiles = files.filter((f) => f.type === 'file' && f.name.endsWith('.md'))
 
     const updates = await Promise.allSettled(
@@ -193,7 +186,7 @@ export async function getProjectUpdates(owner: string, repo: string): Promise<Pr
           `${GITHUB_API}/repos/${owner}/${repo}/contents/.kap/updates/${f.name}`
         )
         if (!fileRes.ok) return null
-        const file = await fileRes.json() as GitHubContentFile
+        const file = (await fileRes.json()) as GitHubContentFile
         if (file.encoding !== 'base64') return null
         const raw = decodeBase64(file.content)
         const fm = parseFrontmatter(raw)
@@ -218,7 +211,6 @@ export async function getProjectUpdates(owner: string, repo: string): Promise<Pr
   }
 }
 
-// Lit les decisions depuis .kap/decisions/ du repo
 export async function getProjectDecisions(owner: string, repo: string): Promise<ProjectDecision[]> {
   try {
     const res = await githubFetch(
@@ -226,7 +218,7 @@ export async function getProjectDecisions(owner: string, repo: string): Promise<
     )
     if (!res.ok) return []
 
-    const files = await res.json() as Array<{ name: string; type: string }>
+    const files = (await res.json()) as Array<{ name: string; type: string }>
     const mdFiles = files.filter((f) => f.type === 'file' && f.name.endsWith('.md'))
 
     const decisions = await Promise.allSettled(
@@ -235,7 +227,7 @@ export async function getProjectDecisions(owner: string, repo: string): Promise<
           `${GITHUB_API}/repos/${owner}/${repo}/contents/.kap/decisions/${f.name}`
         )
         if (!fileRes.ok) return null
-        const file = await fileRes.json() as GitHubContentFile
+        const file = (await fileRes.json()) as GitHubContentFile
         if (file.encoding !== 'base64') return null
         const raw = decodeBase64(file.content)
         const fm = parseFrontmatter(raw)
@@ -255,7 +247,6 @@ export async function getProjectDecisions(owner: string, repo: string): Promise<
   }
 }
 
-// Lit les signaux communautaires depuis les GitHub Issues avec label kap-signal
 export async function getProjectSignals(owner: string, repo: string): Promise<ProjectSignal[]> {
   try {
     const res = await githubFetch(
@@ -263,7 +254,7 @@ export async function getProjectSignals(owner: string, repo: string): Promise<Pr
     )
     if (!res.ok) return []
 
-    const issues = await res.json() as GitHubIssue[]
+    const issues = (await res.json()) as GitHubIssue[]
     return issues.map((issue) => ({
       title: issue.title,
       votes: issue.reactions['+1'] ?? 0,
