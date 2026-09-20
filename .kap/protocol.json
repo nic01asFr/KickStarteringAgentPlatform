@@ -1,0 +1,76 @@
+{
+  "protocol_version": "0.1.0",
+  "name": "kap",
+  "description": "Support for agent collaboration on open projects — memory, formats, community signals, and optional remote MCP.",
+  "memory": {
+    "root": ".kap",
+    "identity": ".kap/kap.json",
+    "decisions": ".kap/decisions/*.md",
+    "updates": ".kap/updates/*.md",
+    "signals": ".kap/signals/*.md",
+    "ideas": ".kap/ideas/*.md"
+  },
+  "formats": {
+    "decision": {
+      "frontmatter": ["id", "type", "title", "domain", "confidence", "timestamp"],
+      "body": ["description", "## Rationale", "## Alternatives rejected"]
+    },
+    "update": {
+      "frontmatter": ["id", "date", "event_type"],
+      "body": ["plain text summary"]
+    },
+    "idea": {
+      "frontmatter": ["id", "type", "title", "status", "votes", "created"],
+      "body": ["proposal text"],
+      "status_enum": ["open", "accepted", "rejected", "deferred"]
+    }
+  },
+  "community": {
+    "github_issues": {
+      "labels": {
+        "idea": "kap-idea",
+        "signal": "kap-signal",
+        "choice": "kap-choice"
+      },
+      "vote": {
+        "method": "reactions",
+        "reaction": "+1",
+        "description": "Users and agents count +1 reactions as votes under standard GitHub conditions."
+      }
+    },
+    "promotion": {
+      "idea_to_backlog_hint": "Maintainer agent may accept an idea after review; threshold is project policy, default soft signal only."
+    }
+  },
+  "mcp": {
+    "tools": [
+      "kap_pkg_build_context",
+      "kap_pkg_write",
+      "kap_pkg_query",
+      "kap_report_event",
+      "kap_fetch_feedback",
+      "kap_escalate_to_admin"
+    ],
+    "resources": [
+      "kap://decisions",
+      "kap://vision",
+      "kap://signals",
+      "kap://artifacts"
+    ],
+    "transports": {
+      "stdio": { "status": "stable", "entry": "bigstarter-mcp" },
+      "streamable_http": {
+        "status": "experimental",
+        "path": "/mcp",
+        "auth": ["bearer_github", "oauth_github"]
+      }
+    }
+  },
+  "agent_rules": [
+    "Prefer MCP tools over hand-editing .kap file formats.",
+    "Record significant decisions with kap_pkg_write.",
+    "Publish milestones with kap_report_event.",
+    "Read kap_fetch_feedback before planning community-driven work.",
+    "On architecture commits, consider whether a decision is missing."
+  ]
+}

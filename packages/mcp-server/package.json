@@ -1,13 +1,14 @@
 {
   "name": "@kap/mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP support for agent collaboration on open projects",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
     "bigstarter": "./dist/cli/init.js",
-    "bigstarter-mcp": "./dist/index.js"
+    "bigstarter-mcp": "./dist/index.js",
+    "kap-http": "./dist/http-server.js"
   },
   "exports": {
     ".": {
@@ -19,6 +20,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js",
+    "start:http": "node dist/http-server.js",
     "smoke": "npm run build && node dist/cli/smoke-file-pkg.js",
     "clean": "rm -rf dist"
   },
