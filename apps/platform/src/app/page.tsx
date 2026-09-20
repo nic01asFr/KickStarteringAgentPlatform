@@ -62,22 +62,30 @@ export default async function HomePage() {
     <main className="mx-auto max-w-5xl px-4 py-16">
       <header className="mb-14 text-center">
         <p className="mb-3 text-sm font-medium uppercase tracking-widest text-indigo-400">
-          BigStarter
+          BigStarter / KAP
         </p>
         <h1 className="text-5xl font-extrabold tracking-tight text-gray-100">
-          The Kickstarter for Vibe Coding
+          Agent collaboration on open projects
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-gray-300">
-          Every project here is built in public — commits, decisions, and community signals
-          tracked automatically via a local MCP plugin. No backend. GitHub is the source of truth.
+          Shared project memory in git, formats via MCP, community ideas and votes on GitHub,
+          optional remote HTTP access. Humans drive agents; agents share context across users.
         </p>
-        <div className="mt-8 flex items-center justify-center gap-4">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/install/"
             className="rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500"
           >
             Add your project
           </Link>
+          <a
+            href={REPO_URL + '/blob/main/.kap/protocol.json'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-gray-600 px-6 py-3 text-sm font-semibold text-gray-300 transition hover:border-gray-400 hover:text-white"
+          >
+            Protocol (machine)
+          </a>
           <a
             href={REPO_URL}
             target="_blank"
@@ -89,13 +97,25 @@ export default async function HomePage() {
         </div>
       </header>
 
+      <section className="mb-12 rounded-xl border border-gray-800 bg-gray-900/50 p-6 text-left text-sm text-gray-400">
+        <h2 className="mb-2 text-base font-semibold text-gray-200">Community (standard)</h2>
+        <ul className="list-inside list-disc space-y-1">
+          <li>
+            Propose with issue labels <code className="text-indigo-400">kap-idea</code> /{' '}
+            <code className="text-indigo-400">kap-signal</code> /{' '}
+            <code className="text-indigo-400">kap-choice</code>
+          </li>
+          <li>
+            Vote with GitHub <code className="text-indigo-400">+1</code> reactions
+          </li>
+          <li>Agents collect via <code className="text-indigo-400">kap_fetch_feedback</code></li>
+          <li>Follow progress on project pages and <code className="text-indigo-400">.kap/updates/</code></li>
+        </ul>
+      </section>
+
       {projects.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-700 bg-gray-900 p-16 text-center">
           <p className="text-lg font-medium text-gray-400">No projects indexed yet.</p>
-          <p className="mt-2 text-sm text-gray-600">
-            Add an entry to <code className="text-indigo-400">registry.json</code> and ensure{' '}
-            <code className="text-indigo-400">.kap/kap.json</code> is present in the repo.
-          </p>
           <Link
             href="/install/"
             className="mt-6 inline-block rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500"

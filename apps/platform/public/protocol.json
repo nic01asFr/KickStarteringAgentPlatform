@@ -1,0 +1,18 @@
+{
+  "$comment": "Copied for static Pages; canonical source is repo .kap/protocol.json",
+  "protocol_version": "0.1.0",
+  "canonical": "https://github.com/nic01asFr/KickStarteringAgentPlatform/blob/main/.kap/protocol.json",
+  "community": {
+    "labels": { "idea": "kap-idea", "signal": "kap-signal", "choice": "kap-choice" },
+    "vote": { "method": "reactions", "reaction": "+1" }
+  },
+  "mcp": {
+    "transports": ["stdio", "streamable_http"],
+    "tools": [
+      "kap_pkg_build_context",
+      "kap_pkg_write",
+      "kap_report_event",
+      "kap_fetch_feedback"
+    ]
+  }
+}
