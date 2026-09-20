@@ -1,6 +1,6 @@
 ---
-date: "2026-09-20T15:39:27.955Z"
-event_type: "push"
+date: "2026-09-20T16:48:17.837Z"
+event_type: "pull_request"
 ---
 
-Activity on nic01asFr/KickStarteringAgentPlatform (push, main, 4be44fa). Latest: 4be44fa Merge pull request #11 from nic01asFr/ci/docker-publish.
+Activity on nic01asFr/KickStarteringAgentPlatform (pull_request, main, 46809f4). Latest: 46809f4 Merge pull request #12 from nic01asFr/feat/onyxia-charts.
