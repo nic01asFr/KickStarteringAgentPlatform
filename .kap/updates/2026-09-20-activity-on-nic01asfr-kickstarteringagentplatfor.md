@@ -1,6 +1,6 @@
 ---
-date: "2026-09-20T08:19:57.039Z"
-event_type: "push"
+date: "2026-09-20T08:42:38.586Z"
+event_type: "pull_request"
 ---
 
-Activity on nic01asFr/KickStarteringAgentPlatform (push, main, 5570861). Latest: 5570861 Merge pull request #7 from nic01asFr/feat/mcp-file-pkg-default.
+Activity on nic01asFr/KickStarteringAgentPlatform (pull_request, main, 2462207). Latest: 2462207 Merge pull request #8 from nic01asFr/feat/cli-init-and-smoke.
