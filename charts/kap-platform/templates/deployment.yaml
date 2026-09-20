@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "library-chart.fullname" . }}
+  labels:
+    {{- include "library-chart.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.platform.replicas }}
+  selector:
+    matchLabels:
+      {{- include "library-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "library-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        # ── Platform: Next.js standalone server ──
+        - name: {{ include "kap-platform.platformName" . }}
+          image: "{{ .Values.platform.image.repository }}:{{ .Values.platform.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.platform.image.pullPolicy }}
+          ports:
+            - containerPort: {{ include "kap-platform.platformPort" . }}
+              name: http
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "{{ include "kap-platform.platformPort" . }}"
+          resources:
+            {{- toYaml .Values.platform.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ include "kap-platform.platformPort" . }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ include "kap-platform.platformPort" . }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
+        # ── Caddy: reverse proxy + health check ──
+        - name: {{ include "kap-platform.caddyName" . }}
+          image: "{{ .Values.caddy.image.repository }}:{{ .Values.caddy.image.tag }}"
+          imagePullPolicy: {{ .Values.caddy.image.pullPolicy }}
+          ports:
+            - containerPort: {{ include "kap-platform.caddyPort" . }}
+              name: http
+              protocol: TCP
+          volumeMounts:
+            - name: caddyfile
+              mountPath: /etc/caddy
+              readOnly: true
+          resources:
+            {{- toYaml .Values.caddy.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ include "kap-platform.caddyPort" . }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ include "kap-platform.caddyPort" . }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+      volumes:
+        - name: caddyfile
+          configMap:
+            name: {{ include "library-chart.fullname" . }}-caddy
