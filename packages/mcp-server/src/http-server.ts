@@ -1,24 +1,28 @@
 #!/usr/bin/env node
 /**
- * Experimental Streamable HTTP entry for KAP MCP.
+ * KAP MCP — Streamable HTTP transport
  *
- * Auth (v0):
- *   Authorization: Bearer <github_pat_or_token>
- * OAuth GitHub App metadata can be added later (.well-known).
+ * Endpoint: POST/GET/DELETE /mcp
+ * Auth: Authorization: Bearer <github_token> (set KAP_HTTP_AUTH=false to disable)
+ * Also: GET /health, GET /protocol.json
  *
- * Run (after build):
  *   KAP_HTTP_PORT=8787 node dist/http-server.js
- *
- * Note: full Streamable HTTP transport wiring depends on SDK version.
- * This process validates Bearer auth and boots the same tool surface as stdio
- * when STREAMABLE transport is available; otherwise it serves a health + protocol contract.
  */
 
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { randomUUID } from 'node:crypto'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import express, { type Request, type Response } from 'express'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
+import { createKapServer } from './create-kap-server.js'
 
 const PORT = Number(process.env['KAP_HTTP_PORT'] ?? 8787)
+const HOST = process.env['KAP_HTTP_HOST'] ?? '0.0.0.0'
+const AUTH_REQUIRED = process.env['KAP_HTTP_AUTH'] !== 'false'
+
+/** sessionId → transport */
+const transports: Record<string, StreamableHTTPServerTransport> = {}
 
 function protocolPayload(): string {
   const candidates = [
@@ -30,15 +34,15 @@ function protocolPayload(): string {
   }
   return JSON.stringify({
     protocol_version: '0.1.0',
-    mcp: { transports: { streamable_http: { status: 'experimental', path: '/mcp' } } },
+    mcp: { transports: { streamable_http: { status: 'available', path: '/mcp' } } },
   })
 }
 
-function getBearer(req: IncomingMessage): string | null {
+function getBearer(req: Request): string | null {
   const h = req.headers['authorization']
   if (!h || Array.isArray(h)) return null
   const m = /^Bearer\s+(.+)$/i.exec(h)
-  return m?.[1] ?? null
+  return m?.[1]?.trim() ?? null
 }
 
 async function validateGitHubToken(token: string): Promise<boolean> {
@@ -56,61 +60,122 @@ async function validateGitHubToken(token: string): Promise<boolean> {
   }
 }
 
-const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-  const url = req.url ?? '/'
-
-  if (req.method === 'GET' && (url === '/' || url === '/health')) {
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ok: true, service: 'kap-mcp', transport: 'http-skeleton' }))
-    return
+async function requireAuth(req: Request, res: Response): Promise<string | null> {
+  if (!AUTH_REQUIRED) return 'auth-disabled'
+  const token = getBearer(req)
+  if (!token) {
+    res.status(401).set('WWW-Authenticate', 'Bearer realm="kap-mcp"').json({
+      error: 'missing_bearer',
+      hint: 'Authorization: Bearer <github_token>',
+    })
+    return null
   }
-
-  if (req.method === 'GET' && url === '/protocol.json') {
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(protocolPayload())
-    return
+  const ok = await validateGitHubToken(token)
+  if (!ok) {
+    res.status(403).json({ error: 'invalid_token' })
+    return null
   }
+  // Make token available for FilePKG optional GitHub push during this process
+  if (!process.env['GITHUB_TOKEN'] && !process.env['GITHUB_APP_TOKEN']) {
+    process.env['GITHUB_TOKEN'] = token
+  }
+  return token
+}
 
-  if (url.startsWith('/mcp')) {
-    const token = getBearer(req)
-    if (!token) {
-      res.writeHead(401, {
-        'Content-Type': 'application/json',
-        'WWW-Authenticate': 'Bearer realm="kap-mcp"',
+async function main(): Promise<void> {
+  const app = express()
+  app.use(express.json({ limit: '4mb' }))
+
+  app.get(['/', '/health'], (_req, res) => {
+    res.json({
+      ok: true,
+      service: 'kap-mcp',
+      transport: 'streamable-http',
+      sessions: Object.keys(transports).length,
+      auth_required: AUTH_REQUIRED,
+    })
+  })
+
+  app.get('/protocol.json', (_req, res) => {
+    res.type('application/json').send(protocolPayload())
+  })
+
+  app.all('/mcp', async (req: Request, res: Response) => {
+    try {
+      const token = await requireAuth(req, res)
+      if (token === null) return
+
+      const sessionIdHeader = req.headers['mcp-session-id']
+      const sessionId =
+        typeof sessionIdHeader === 'string' ? sessionIdHeader : undefined
+
+      // Existing session
+      if (sessionId && transports[sessionId]) {
+        const transport = transports[sessionId]!
+        await transport.handleRequest(req, res, req.body)
+        return
+      }
+
+      // New session: must be initialize
+      if (req.method === 'POST' && isInitializeRequest(req.body)) {
+        const server = createKapServer()
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (id: string) => {
+            transports[id] = transport
+            process.stderr.write(`[kap-mcp-http] session initialized ${id}\n`)
+          },
+        })
+
+        transport.onclose = () => {
+          const id = transport.sessionId
+          if (id && transports[id]) {
+            delete transports[id]
+            process.stderr.write(`[kap-mcp-http] session closed ${id}\n`)
+          }
+        }
+
+        await server.connect(transport)
+        await transport.handleRequest(req, res, req.body)
+        return
+      }
+
+      // Stateless optional path: POST without session when KAP_HTTP_STATELESS=true
+      if (
+        process.env['KAP_HTTP_STATELESS'] === 'true' &&
+        req.method === 'POST'
+      ) {
+        const server = createKapServer()
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+        })
+        await server.connect(transport)
+        await transport.handleRequest(req, res, req.body)
+        return
+      }
+
+      res.status(400).json({
+        error: 'invalid_session',
+        hint: 'Send initialize POST to open a session, or include mcp-session-id for an existing one.',
       })
-      res.end(JSON.stringify({ error: 'missing_bearer', hint: 'Authorization: Bearer <github_token>' }))
-      return
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      process.stderr.write(`[kap-mcp-http] error: ${message}\n`)
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'internal_error', message })
+      }
     }
-    const ok = await validateGitHubToken(token)
-    if (!ok) {
-      res.writeHead(403, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ error: 'invalid_token' }))
-      return
-    }
+  })
 
-    // Placeholder: full Streamable HTTP MCP session goes here (SDK transport).
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(
-      JSON.stringify({
-        ok: true,
-        message:
-          'Bearer accepted. Wire StreamableHTTPServerTransport from MCP SDK for full tool sessions.',
-        protocol: '/protocol.json',
-        tools_hint: [
-          'kap_pkg_build_context',
-          'kap_pkg_write',
-          'kap_report_event',
-          'kap_fetch_feedback',
-        ],
-      }),
+  app.listen(PORT, HOST, () => {
+    process.stderr.write(
+      `[kap-mcp-http] Streamable HTTP on http://${HOST}:${PORT}/mcp (auth=${AUTH_REQUIRED})\n`,
     )
-    return
-  }
+  })
+}
 
-  res.writeHead(404, { 'Content-Type': 'application/json' })
-  res.end(JSON.stringify({ error: 'not_found' }))
-})
-
-server.listen(PORT, () => {
-  process.stderr.write(`[kap-mcp-http] listening on :${PORT} (health /, protocol /protocol.json, mcp /mcp)\n`)
+main().catch((err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err)
+  process.stderr.write(`[kap-mcp-http] fatal: ${message}\n`)
+  process.exit(1)
 })

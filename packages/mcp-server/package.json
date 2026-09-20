@@ -1,6 +1,6 @@
 {
   "name": "@kap/mcp-server",
-  "version": "0.1.1",
+  "version": "0.4.0",
   "description": "MCP support for agent collaboration on open projects",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,7 +27,7 @@
   "keywords": [
     "mcp",
     "ai-agents",
-    "build-in-public",
+    "streamable-http",
     "collaboration",
     "github"
   ],
@@ -44,11 +44,14 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@octokit/rest": "^21.0.0",
+    "express": "^4.21.0",
     "kuzu": "^0.7.1",
     "ulid": "^2.4.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
   }
 }
