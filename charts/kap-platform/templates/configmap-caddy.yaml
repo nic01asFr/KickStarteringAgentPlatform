@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "library-chart.fullname" . }}-caddy
+  labels:
+    {{- include "library-chart.labels" . | nindent 4 }}
+data:
+  Caddyfile: |
+    :{{ include "kap-platform.caddyPort" . }}
+
+    health_check {
+      path /healthz
+      port {{ include "kap-platform.platformPort" . }}
+    }
+
+    respond /healthz 200
+
+    reverse_proxy {{ include "kap-platform.platformName" . }}:{{ include "kap-platform.platformPort" . }} {
+      flush_interval -1
+    }

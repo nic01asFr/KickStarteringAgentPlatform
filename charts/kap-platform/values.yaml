@@ -1,0 +1,66 @@
+# Valeurs par défaut du chart KAP pour Onyxia.
+
+platform:
+  image:
+    repository: nic01asfr/kickstartering-agent-platform
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+caddy:
+  image:
+    repository: caddy
+    tag: "2.9-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+persistence:
+  keepOnUninstall: false
+
+networking:
+  service:
+    port: 8080
+
+ingress:
+  enabled: true
+  tls: true
+  tlsSecretName: ""
+  className: ""
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+
+tools: []
+
+userPreferences:
+  language: fr
+
+global:
+  suspend: false
+
+imagePullSecrets: []
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+nameOverride: ""
+fullnameOverride: ""

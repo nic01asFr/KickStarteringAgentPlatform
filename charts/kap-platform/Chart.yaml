@@ -1,0 +1,19 @@
+apiVersion: v2
+name: kap-platform
+description: Plateforme KickStartering Agent Platform — crée, orchestre et surveille tes agents IA
+icon: https://raw.githubusercontent.com/nic01asFr/KickStarteringAgentPlatform/main/public/logo.svg
+keywords:
+  - agent
+  - ai
+  - multi-agent
+  - orchestration
+home: https://github.com/nic01asFr/KickStarteringAgentPlatform
+sources:
+  - https://github.com/nic01asFr/KickStarteringAgentPlatform
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: library-chart
+    version: "2.1.9"
+    repository: https://inseefrlab.github.io/helm-charts-interactive-services
