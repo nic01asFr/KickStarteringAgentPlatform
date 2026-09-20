@@ -1,7 +1,7 @@
 {
   "name": "@kap/mcp-server",
   "version": "0.1.0",
-  "description": "MCP plugin for building in public with AI agents",
+  "description": "MCP support for agent collaboration on open projects",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,11 +19,15 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js",
+    "smoke": "npm run build && node dist/cli/smoke-file-pkg.js",
     "clean": "rm -rf dist"
   },
   "keywords": [
-    "mcp", "ai-agents", "build-in-public", "vibe-coding",
-    "github", "claude"
+    "mcp",
+    "ai-agents",
+    "build-in-public",
+    "collaboration",
+    "github"
   ],
   "homepage": "https://github.com/nic01asFr/KickStarteringAgentPlatform",
   "repository": {
@@ -31,7 +35,10 @@
     "url": "https://github.com/nic01asFr/KickStarteringAgentPlatform.git"
   },
   "license": "MIT",
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@octokit/rest": "^21.0.0",
