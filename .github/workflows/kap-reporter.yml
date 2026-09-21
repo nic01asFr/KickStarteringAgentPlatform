@@ -18,10 +18,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Generate update
         run: |
@@ -41,8 +43,6 @@ jobs:
             commits = '(no git log)'
           }
 
-          // Template-only in CI — no Anthropic dependency.
-          // Editorial LLM updates stay in the local MCP plugin (sampling).
           const lines = [
             `Activity on ${repo} (${event}, ${ref}${sha ? `, ${sha}` : ''}).`,
           ]
@@ -81,10 +81,21 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
 
-      - name: Commit update
+      - name: Commit and push update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .kap/updates/
-          git diff --cached --quiet || git commit -m "chore: add project update [skip ci]"
-          git push
+          if git diff --cached --quiet; then
+            echo "No update to commit"
+            exit 0
+          fi
+          git commit -m "chore: add project update [skip ci]"
+          # Avoid rejected non-fast-forward when another job pushed to main
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            echo "Push attempt $i failed, retrying..."
+            sleep $((i * 2))
+          done
+          echo "Failed to push after retries"
+          exit 1
