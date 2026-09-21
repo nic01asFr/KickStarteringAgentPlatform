@@ -1,6 +1,6 @@
 ---
-date: "2026-09-21T08:56:36.613Z"
-event_type: "pull_request"
+date: "2026-09-21T09:04:46.306Z"
+event_type: "push"
 ---
 
-Activity on nic01asFr/KickStarteringAgentPlatform (pull_request, main, a777271). Latest: a777271 Merge pull request #13 from nic01asFr/feat/onyxia-kap-mcp-chart.
+Activity on nic01asFr/KickStarteringAgentPlatform (push, main, 9987316). Latest: 9987316 Merge pull request #14 from nic01asFr/fix/dockerfile-uid-node.
