@@ -38,6 +38,16 @@ spec:
               value: {{ ternary "true" "false" .Values.security.authRequired | quote }}
             - name: KAP_HTTP_STATELESS
               value: {{ ternary "true" "false" .Values.kap.stateless | quote }}
+            - name: KAP_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kap-mcp.secretName" . }}
+                  key: BEARER_TOKEN
+            - name: BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kap-mcp.secretName" . }}
+                  key: BEARER_TOKEN
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:
