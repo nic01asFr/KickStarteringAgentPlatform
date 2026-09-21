@@ -1,6 +1,6 @@
 ---
-date: "2026-09-21T09:18:32.314Z"
-event_type: "push"
+date: "2026-09-21T12:20:30.598Z"
+event_type: "pull_request"
 ---
 
-Activity on nic01asFr/KickStarteringAgentPlatform (push, main, ecb05f9). Latest: ecb05f9 Merge pull request #15 from nic01asFr/fix/dockerfile-standalone-build.
+Activity on nic01asFr/KickStarteringAgentPlatform (pull_request, main, 74b8e41). Latest: 74b8e41 Merge pull request #16 from nic01asFr/fix/reporter-push-rebase.
