@@ -1,0 +1,93 @@
+# Chart kap-mcp pour Onyxia / SSPCloud
+# Formulaire catalogue : values.schema.json
+
+service:
+  image:
+    repository: ghcr.io/nic01asfr/kap-mcp
+    tag: "0.4.0"
+    pullPolicy: IfNotPresent
+
+# Auth MCP (Bearer). Onyxia peut injecter {{service.oneTimePassword}}.
+security:
+  # Si non vide : jeton Bearer attendu (sinon KAP_HTTP_AUTH=false uniquement en dev).
+  bearerToken: ""
+  # true = exiger Authorization: Bearer (recommandé en prod).
+  authRequired: true
+  allowlist:
+    enabled: false
+    ip: "0.0.0.0/0"
+  networkPolicy:
+    enabled: false
+    from: []
+
+# Token GitHub pour push optionnel vers .kap/ des repos (Contents API).
+github:
+  token: ""
+  owner: ""
+  repo: ""
+
+kap:
+  dataDir: /data/.kap
+  httpPort: 8787
+  # Mode sessions MCP (défaut). true = transport sans sessionId.
+  stateless: false
+  extraEnv: {}
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  existingClaim: ""
+  keepOnUninstall: false
+
+networking:
+  type: ClusterIP
+  service:
+    port: 8787
+
+ingress:
+  enabled: true
+  tls: true
+  ingressClassName: ""
+  hostname: ""
+  useCertManager: false
+  certManagerClusterIssuer: ""
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+userPreferences:
+  language: fr
+
+global:
+  suspend: false
+
+podSecurityContext:
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+nameOverride: ""
+fullnameOverride: ""
