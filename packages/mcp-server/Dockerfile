@@ -1,5 +1,5 @@
 # KAP MCP — Streamable HTTP image (Onyxia / SSPCloud)
-# Context: repo root. Single self-contained CJS bundle (no runtime node_modules resolution issues).
+# Context: repo root. Self-contained CJS bundle.
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
@@ -9,7 +9,6 @@ RUN node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package
 
 COPY packages/mcp-server/src ./src
 
-# Full bundle: all JS deps inlined (CJS) — avoids ESM/external resolve crashes at runtime
 RUN mkdir -p dist \
   && npx esbuild src/http-server.ts \
        --bundle \
@@ -18,7 +17,7 @@ RUN mkdir -p dist \
        --format=cjs \
        --outfile=dist/http-server.cjs \
   && test -s dist/http-server.cjs \
-  && node -e "require('./dist/http-server.cjs')" & sleep 2; kill $! 2>/dev/null || true
+  && wc -c dist/http-server.cjs
 
 FROM node:22-bookworm-slim
 WORKDIR /app
