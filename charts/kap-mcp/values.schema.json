@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ingress": {
+      "type": "object",
+      "description": "Exposition HTTPS du serveur MCP",
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "title": "Hostname public",
+          "description": "Ex. kap-mcp-user.lab.sspcloud.fr",
+          "x-onyxia": {
+            "overwriteDefaultWith": "{{project.id}}-{{k8s.namespace}}-{{k8s.namespace}}.{{k8s.domain}}"
+          }
+        },
+        "enabled": { "type": "boolean", "default": true },
+        "tls": { "type": "boolean", "default": true }
+      }
+    },
+    "security": {
+      "type": "object",
+      "title": "Sécurité",
+      "properties": {
+        "authRequired": {
+          "type": "boolean",
+          "title": "Exiger Bearer",
+          "default": true
+        },
+        "bearerToken": {
+          "type": "string",
+          "title": "Jeton Bearer MCP",
+          "description": "Vide = généré et stocké dans le Secret de la release",
+          "x-onyxia": {
+            "overwriteDefaultWith": "{{service.oneTimePassword}}"
+          }
+        }
+      }
+    },
+    "github": {
+      "type": "object",
+      "title": "GitHub (push .kap optionnel)",
+      "properties": {
+        "token": { "type": "string", "title": "GitHub token", "default": "" },
+        "owner": { "type": "string", "title": "Owner", "default": "" },
+        "repo": { "type": "string", "title": "Repo", "default": "" }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "size": { "type": "string", "default": "1Gi" }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "string", "default": "50m" },
+            "memory": { "type": "string", "default": "256Mi" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "string", "default": "1000m" },
+            "memory": { "type": "string", "default": "1Gi" }
+          }
+        }
+      }
+    },
+    "global": {
+      "type": "object",
+      "properties": {
+        "suspend": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

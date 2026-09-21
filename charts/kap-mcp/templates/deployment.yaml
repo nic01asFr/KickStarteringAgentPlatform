@@ -1,0 +1,98 @@
+{{- if not .Values.global.suspend }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "library-chart.fullname" . }}
+  labels:
+    {{- include "library-chart.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "library-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "library-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: kap-mcp
+          image: "{{ .Values.service.image.repository }}:{{ .Values.service.image.tag }}"
+          imagePullPolicy: {{ .Values.service.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: mcp
+              containerPort: {{ .Values.kap.httpPort }}
+              protocol: TCP
+          env:
+            - name: KAP_HTTP_PORT
+              value: {{ .Values.kap.httpPort | quote }}
+            - name: KAP_HTTP_HOST
+              value: "0.0.0.0"
+            - name: KAP_DATA_DIR
+              value: {{ .Values.kap.dataDir | quote }}
+            - name: KAP_HTTP_AUTH
+              value: {{ ternary "true" "false" .Values.security.authRequired | quote }}
+            - name: KAP_HTTP_STATELESS
+              value: {{ ternary "true" "false" .Values.kap.stateless | quote }}
+            - name: KAP_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kap-mcp.secretName" . }}
+                  key: BEARER_TOKEN
+            - name: BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kap-mcp.secretName" . }}
+                  key: BEARER_TOKEN
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kap-mcp.secretName" . }}
+                  key: GITHUB_TOKEN
+                  optional: true
+            - name: GITHUB_OWNER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kap-mcp.secretName" . }}
+                  key: GITHUB_OWNER
+                  optional: true
+            - name: GITHUB_REPO
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kap-mcp.secretName" . }}
+                  key: GITHUB_REPO
+                  optional: true
+            {{- range $k, $v := .Values.kap.extraEnv }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: mcp
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: mcp
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "library-chart.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: kap-mcp
+description: KAP / BigStarter MCP — mémoire projet et collab d'agents (Streamable HTTP) pour SSPCloud Onyxia.
+icon: https://nic01asFr.github.io/KickStarteringAgentPlatform/favicon.ico
+keywords:
+  - mcp
+  - llm
+  - agents
+  - collaboration
+  - git
+  - bigstarter
+  - kap
+home: https://nic01asFr.github.io/KickStarteringAgentPlatform/
+sources:
+  - https://github.com/nic01asFr/KickStarteringAgentPlatform
+type: application
+version: 0.1.0
+appVersion: "0.4.0"
+dependencies:
+  - name: library-chart
+    version: 2.1.7
+    repository: https://inseefrlab.github.io/helm-charts-interactive-services

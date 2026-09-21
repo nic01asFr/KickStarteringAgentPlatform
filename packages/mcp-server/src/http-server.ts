@@ -2,9 +2,9 @@
 /**
  * KAP MCP — Streamable HTTP transport
  *
- * Endpoint: POST/GET/DELETE /mcp
- * Auth: Authorization: Bearer <github_token> (set KAP_HTTP_AUTH=false to disable)
- * Also: GET /health, GET /protocol.json
+ * Auth (when KAP_HTTP_AUTH !== false):
+ *   1. Bearer matches KAP_BEARER_TOKEN / BEARER_TOKEN (service token, Onyxia)
+ *   2. Or Bearer is a valid GitHub PAT (api.github.com/user)
  *
  *   KAP_HTTP_PORT=8787 node dist/http-server.js
  */
@@ -21,7 +21,6 @@ const PORT = Number(process.env['KAP_HTTP_PORT'] ?? 8787)
 const HOST = process.env['KAP_HTTP_HOST'] ?? '0.0.0.0'
 const AUTH_REQUIRED = process.env['KAP_HTTP_AUTH'] !== 'false'
 
-/** sessionId → transport */
 const transports: Record<string, StreamableHTTPServerTransport> = {}
 
 function protocolPayload(): string {
@@ -45,6 +44,14 @@ function getBearer(req: Request): string | null {
   return m?.[1]?.trim() ?? null
 }
 
+function serviceBearer(): string | null {
+  const t =
+    process.env['KAP_BEARER_TOKEN'] ??
+    process.env['BEARER_TOKEN'] ??
+    null
+  return t && t.length > 0 ? t : null
+}
+
 async function validateGitHubToken(token: string): Promise<boolean> {
   try {
     const res = await fetch('https://api.github.com/user', {
@@ -62,24 +69,36 @@ async function validateGitHubToken(token: string): Promise<boolean> {
 
 async function requireAuth(req: Request, res: Response): Promise<string | null> {
   if (!AUTH_REQUIRED) return 'auth-disabled'
+
   const token = getBearer(req)
   if (!token) {
     res.status(401).set('WWW-Authenticate', 'Bearer realm="kap-mcp"').json({
       error: 'missing_bearer',
-      hint: 'Authorization: Bearer <github_token>',
+      hint: 'Authorization: Bearer <service_token_or_github_pat>',
     })
     return null
   }
-  const ok = await validateGitHubToken(token)
-  if (!ok) {
-    res.status(403).json({ error: 'invalid_token' })
-    return null
+
+  const expected = serviceBearer()
+  if (expected && token === expected) {
+    return token
   }
-  // Make token available for FilePKG optional GitHub push during this process
-  if (!process.env['GITHUB_TOKEN'] && !process.env['GITHUB_APP_TOKEN']) {
-    process.env['GITHUB_TOKEN'] = token
+
+  const ghOk = await validateGitHubToken(token)
+  if (ghOk) {
+    if (!process.env['GITHUB_TOKEN'] && !process.env['GITHUB_APP_TOKEN']) {
+      process.env['GITHUB_TOKEN'] = token
+    }
+    return token
   }
-  return token
+
+  res.status(403).json({
+    error: 'invalid_token',
+    hint: expected
+      ? 'Use the service BEARER_TOKEN from the release Secret, or a valid GitHub PAT'
+      : 'Set KAP_BEARER_TOKEN or use a valid GitHub PAT',
+  })
+  return null
 }
 
 async function main(): Promise<void> {
@@ -93,6 +112,7 @@ async function main(): Promise<void> {
       transport: 'streamable-http',
       sessions: Object.keys(transports).length,
       auth_required: AUTH_REQUIRED,
+      service_bearer_configured: Boolean(serviceBearer()),
     })
   })
 
@@ -109,14 +129,11 @@ async function main(): Promise<void> {
       const sessionId =
         typeof sessionIdHeader === 'string' ? sessionIdHeader : undefined
 
-      // Existing session
       if (sessionId && transports[sessionId]) {
-        const transport = transports[sessionId]!
-        await transport.handleRequest(req, res, req.body)
+        await transports[sessionId]!.handleRequest(req, res, req.body)
         return
       }
 
-      // New session: must be initialize
       if (req.method === 'POST' && isInitializeRequest(req.body)) {
         const server = createKapServer()
         const transport = new StreamableHTTPServerTransport({
@@ -140,11 +157,7 @@ async function main(): Promise<void> {
         return
       }
 
-      // Stateless optional path: POST without session when KAP_HTTP_STATELESS=true
-      if (
-        process.env['KAP_HTTP_STATELESS'] === 'true' &&
-        req.method === 'POST'
-      ) {
+      if (process.env['KAP_HTTP_STATELESS'] === 'true' && req.method === 'POST') {
         const server = createKapServer()
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined,
@@ -156,7 +169,7 @@ async function main(): Promise<void> {
 
       res.status(400).json({
         error: 'invalid_session',
-        hint: 'Send initialize POST to open a session, or include mcp-session-id for an existing one.',
+        hint: 'Send initialize POST to open a session, or include mcp-session-id.',
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -169,7 +182,7 @@ async function main(): Promise<void> {
 
   app.listen(PORT, HOST, () => {
     process.stderr.write(
-      `[kap-mcp-http] Streamable HTTP on http://${HOST}:${PORT}/mcp (auth=${AUTH_REQUIRED})\n`,
+      `[kap-mcp-http] Streamable HTTP on http://${HOST}:${PORT}/mcp (auth=${AUTH_REQUIRED}, service_bearer=${Boolean(serviceBearer())})\n`,
     )
   })
 }

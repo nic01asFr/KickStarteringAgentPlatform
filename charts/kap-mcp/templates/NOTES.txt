@@ -1,0 +1,35 @@
+KAP MCP (Streamable HTTP) — {{ .Release.Name }}
+
+{{- if .Values.global.suspend }}
+Service en veille (global.suspend=true).
+{{- else }}
+
+URL MCP :
+  {{ include "kap-mcp.mcpUrl" . }}
+
+Health :
+  {{ include "kap-mcp.baseUrl" . }}/health
+
+Protocol (machine) :
+  {{ include "kap-mcp.baseUrl" . }}/protocol.json
+
+Auth Bearer :
+{{- if .Values.security.authRequired }}
+  Authorization: Bearer <jeton>
+  Jeton (si généré par le chart) : voir Secret {{ include "library-chart.fullname" . }} clé BEARER_TOKEN
+  ou la valeur security.bearerToken du formulaire Onyxia.
+{{- else }}
+  Auth désactivée (security.authRequired=false) — déconseillé en exposition publique.
+{{- end }}
+
+Client agent (exemple) :
+  URL  = {{ include "kap-mcp.mcpUrl" . }}
+  Header Authorization: Bearer …
+
+Mémoire locale du pod : {{ .Values.kap.dataDir }} (PVC si persistence.enabled).
+Push git optionnel : renseigner github.token / owner / repo.
+
+Catalogue / doc :
+  https://github.com/nic01asFr/KickStarteringAgentPlatform
+  https://nic01asFr.github.io/KickStarteringAgentPlatform/
+{{- end }}
