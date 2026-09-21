@@ -1,21 +1,26 @@
 # KAP MCP — Streamable HTTP image for Onyxia / SSPCloud
+# Build context: repository root
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
+# Runtime deps only (no monorepo, no native kuzu required for HTTP file-pkg path)
 COPY packages/mcp-server/package.json ./package.json
-RUN npm install --ignore-scripts
+RUN node -e "const p=require('./package.json'); delete p.dependencies.kuzu; p.devDependencies={typescript:'^5.4.0',esbuild:'^0.25.0'}; require('fs').writeFileSync('package.json', JSON.stringify(p,null,2));" \
+  && npm install
 
-COPY packages/mcp-server/tsconfig.json ./tsconfig.json
 COPY packages/mcp-server/src ./src
-# Compile without monorepo base config (image is package-scoped)
-RUN npx tsc --outDir dist --rootDir src --module NodeNext --moduleResolution NodeNext \
-      --target ES2022 --esModuleInterop --skipLibCheck --declaration false \
-      src/index.ts src/http-server.ts src/create-kap-server.ts src/file-pkg.ts \
-      src/config.ts src/resources.ts src/prompts.ts src/sampling.ts src/api-client.ts \
-      src/types.ts src/tools/index.ts src/tools/local.ts src/tools/events.ts \
-      src/tools/pkg.ts src/tools/governance.ts src/tools/escalation.ts src/tools/agents.ts \
-      src/cli/init.ts src/cli/smoke-file-pkg.ts \
-  || npx tsc -p tsconfig.json --outDir dist --rootDir src --skipLibCheck
+
+# Bundle HTTP entry (resolves TS, externalizes node_modules)
+RUN npx esbuild src/http-server.ts \
+  --bundle \
+  --platform=node \
+  --format=esm \
+  --outfile=dist/http-server.js \
+  --packages=external \
+  --banner:js="import { createRequire } from 'module'; const require = createRequire(import.meta.url);"
+
+# Verify artifact
+RUN test -f dist/http-server.js && node --check dist/http-server.js
 
 FROM node:22-bookworm-slim
 WORKDIR /app
@@ -24,7 +29,7 @@ ENV KAP_HTTP_PORT=8787
 ENV KAP_HTTP_HOST=0.0.0.0
 ENV KAP_DATA_DIR=/data/.kap
 
-# node image already provides uid 1000 (user "node")
+# node image already has uid 1000 (user "node")
 RUN mkdir -p /data/.kap && chown -R node:node /data /app
 
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
