@@ -3,24 +3,24 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
-# Runtime deps only (no monorepo, no native kuzu required for HTTP file-pkg path)
 COPY packages/mcp-server/package.json ./package.json
-RUN node -e "const p=require('./package.json'); delete p.dependencies.kuzu; p.devDependencies={typescript:'^5.4.0',esbuild:'^0.25.0'}; require('fs').writeFileSync('package.json', JSON.stringify(p,null,2));" \
+# Drop native kuzu; add esbuild for bundle
+RUN node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); delete p.dependencies.kuzu; p.devDependencies={esbuild:'^0.25.0'}; fs.writeFileSync('package.json', JSON.stringify(p,null,2));" \
   && npm install
 
 COPY packages/mcp-server/src ./src
 
-# Bundle HTTP entry (resolves TS, externalizes node_modules)
-RUN npx esbuild src/http-server.ts \
-  --bundle \
-  --platform=node \
-  --format=esm \
-  --outfile=dist/http-server.js \
-  --packages=external \
-  --banner:js="import { createRequire } from 'module'; const require = createRequire(import.meta.url);"
-
-# Verify artifact
-RUN test -f dist/http-server.js && node --check dist/http-server.js
+# Single ESM bundle; deps stay in node_modules (--packages=external)
+RUN mkdir -p dist \
+  && npx esbuild src/http-server.ts \
+       --bundle \
+       --platform=node \
+       --target=node22 \
+       --format=esm \
+       --outfile=dist/http-server.js \
+       --packages=external \
+  && test -s dist/http-server.js \
+  && head -c 200 dist/http-server.js
 
 FROM node:22-bookworm-slim
 WORKDIR /app
@@ -29,7 +29,6 @@ ENV KAP_HTTP_PORT=8787
 ENV KAP_HTTP_HOST=0.0.0.0
 ENV KAP_DATA_DIR=/data/.kap
 
-# node image already has uid 1000 (user "node")
 RUN mkdir -p /data/.kap && chown -R node:node /data /app
 
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
