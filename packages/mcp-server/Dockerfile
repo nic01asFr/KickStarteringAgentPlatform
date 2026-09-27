@@ -1,30 +1,40 @@
-# KAP MCP HTTP image — no kuzu (file-pkg only)
-# Build context: repository root
+# KAP MCP HTTP — file-pkg only, zero kuzu
+# Context: repo root
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
 COPY packages/mcp-server/package.json ./package.json
-RUN node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); delete p.dependencies.kuzu; p.devDependencies={esbuild:'^0.25.0'}; fs.writeFileSync('package.json', JSON.stringify(p,null,2));" \
-  && npm install
+RUN node <<'NODE'
+const fs = require('fs');
+const p = JSON.parse(fs.readFileSync('package.json','utf8'));
+delete p.dependencies.kuzu;
+p.devDependencies = { esbuild: '^0.25.0' };
+fs.writeFileSync('package.json', JSON.stringify(p, null, 2));
+NODE
+RUN npm install
 
 COPY packages/mcp-server/src ./src
 
-# Remove Kuzu-based code from the graph (HTTP path uses file-pkg only)
+# HTTP image: only local file-pkg tools (drop remote tool modules + kuzu)
 RUN rm -f src/local-pkg.ts src/kuzu.d.ts \
-  && printf '%s\n' 'module.exports = {};' > /tmp/kuzu-stub.js \
-  && mkdir -p dist \
-  && npx esbuild src/http-server.ts \
-       --bundle \
-       --platform=node \
-       --target=node22 \
-       --format=cjs \
-       --outfile=dist/http-server.cjs \
-       --alias:kuzu=/tmp/kuzu-stub.js \
-       --log-limit=0 \
-  && test -s dist/http-server.cjs \
-  && ! grep -q "Cannot find package" dist/http-server.cjs \
-  && (grep -q "require(\"kuzu\")" dist/http-server.cjs && echo "WARN: kuzu require still in bundle" || echo "OK: no kuzu require") \
-  && wc -c dist/http-server.cjs
+    src/tools/events.ts src/tools/governance.ts src/tools/pkg.ts \
+    src/tools/escalation.ts src/tools/agents.ts \
+ && printf '%s\n' \
+    "import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'" \
+    "import { registerLocalTools } from './local.js'" \
+    "export function isLocalMode(): boolean { return true }" \
+    "export function registerAllTools(server: McpServer): void { registerLocalTools(server) }" \
+    > src/tools/index.ts
+
+RUN mkdir -p dist \
+ && npx esbuild src/http-server.ts \
+      --bundle \
+      --platform=node \
+      --target=node22 \
+      --format=cjs \
+      --outfile=dist/http-server.cjs \
+ && test -s dist/http-server.cjs \
+ && wc -c dist/http-server.cjs
 
 FROM node:22-bookworm-slim
 WORKDIR /app
@@ -35,7 +45,6 @@ ENV KAP_DATA_DIR=/data/.kap
 ENV KAP_API_URL=local
 
 RUN mkdir -p /data/.kap && chown -R node:node /data /app
-
 COPY --from=build --chown=node:node /app/dist/http-server.cjs ./http-server.cjs
 
 USER node
