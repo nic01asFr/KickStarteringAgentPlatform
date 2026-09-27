@@ -26,7 +26,6 @@ jobs:
             image: ghcr.io/nic01asfr/kap-mcp
             context: .
             registry: ghcr
-          # Legacy Docker Hub images (optional — skip if secrets missing)
           - app: platform
             dockerfile: apps/platform/Dockerfile
             image: nic01asfr/bigstarter-platform
@@ -77,7 +76,7 @@ jobs:
           tags: |
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=0.4.0,enable={{is_default_branch}}
+            type=raw,value=0.4.1,enable={{is_default_branch}}
 
       - name: Build and push ${{ matrix.app }}
         if: matrix.registry == 'ghcr' || steps.dockerhub_login.outcome == 'success'
